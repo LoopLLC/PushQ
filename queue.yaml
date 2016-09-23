@@ -1,0 +1,16 @@
+
+queue:
+- name: crm
+
+queue:
+- name: integration
+
+queue:
+- name: campaigns
+
+queue:
+- name: reports
+
+queue:
+- name: messaging
+

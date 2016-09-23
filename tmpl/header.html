@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns='http://www.w3.org/1999/xhtml'>
+
+<head>
+    <title>{{.Title}}</title>
+    <script type='text/javascript' src='/static/script.js'></script>
+
+    <link rel='stylesheet' href='/static/style.css' />
+</head>
+
+<body>
+<script type="text/javascript">
+    if (!window.pushq) window.pushq = new Pushq();
+</script>
+    <form id="headerForm">
+
+<header>
+<div id="headerDiv">
+        <div class="menu">
+            <ul class="nav">
+                <li class="name">
+                    <a href="/admin" style="font-weight:bold;">{{.SiteName}}</a>
+                </li>
+                <li><a href="/admin/keys">API Keys</a></li>
+            </ul>
+        </div>
+        <div class="usermenu">
+            {{ if .IsLoggedIn }}
+            <div class="loggedin">
+                {{.Name}} &nbsp; <a href="{{ .AuthURL }}">[logout]</a>
+            </div>
+            {{ end }}
+
+        </div>
+</div>
+</header>
+    </form>

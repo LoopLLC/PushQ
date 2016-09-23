@@ -1,0 +1,35 @@
+<div id="main">
+
+    <div class="clearfix" style="width:100%">
+        <div class="floatRight" style="padding:5px;">
+
+            <a href="#" class="button" 
+                onclick="pushq.newKey()">Create a New API Key</a>
+
+        </div>
+
+        <div >
+            <h1>API Keys</h1>
+
+        </div>
+    </div>
+
+    <table>
+        <tr>
+            <th>Key</th>
+            <th>Delete</th>
+            <th>&nbsp;</th>
+        </tr>
+
+        {{ range .Keys }}
+
+        <tr>
+            <th>{{.Key}}</th>
+            <th><a class="button" href="#" 
+                onclick="pushq.deleteKey('{{.Key}}')">Delete</a></th>
+            <th></th>
+        </tr>
+        {{ end }}
+    </table>
+
+</div>

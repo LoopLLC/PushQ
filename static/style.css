@@ -1,0 +1,273 @@
+* {
+    box-sizing: border-box;
+}
+html { 
+    height: 100%;
+}
+body {
+    height: 100%;
+    margin: 0; 
+}
+#main > nav {
+    background-color: #bbb;
+}
+#main > aside {			
+    background-color: #ddd;
+}
+#main > article {
+    background-color: #fff;
+}
+
+/* NOW FOR THE GOOD STUFF */
+
+body {
+    /* I'm a Flexbox */
+    display: flex;
+    
+    /* It is kinda unintuitive but 'column' means treat children like rows. */
+    flex-direction: column; 
+} 
+header, footer {
+    /* "flex-basis" controls height when the element is a row like these */
+    flex-basis: 50px; 
+}
+footer {
+    text-align:center;
+}
+#main {
+    /* I'm a Flexbox too. */
+    display: flex; 
+    
+    /* We want this element to take as much height as possible */
+    flex-basis: 100%; 
+    
+    /* BUT we want to allow it to shrink if it can't take up all 100% - which it can't */
+    /* We actually don't have to set this. 1 is the default. 
+    flex-shrink: 1; */
+    
+    /* Again, unintuitive. We want to treat children like columns. 
+        You have to set flex-direction everytime you want to change directions. */
+    flex-direction: row;  
+}
+#main > aside, 
+#main > nav {
+    /* "flex-basis controls width when the element is a column like these. 
+        We only want the <aside> and <nav> elements to take up 20% of the 
+        width of their parent */
+    flex-basis: 20%;
+}
+#main > nav {
+    /* This is kinda cool. In the markup the <article> element comes before 
+        the <nav> element. We normally want the <nav> element to display before 
+        the article, so we reorder the <nav> to be first. */
+    order: -1; 
+}
+#main > article {
+    flex-basis: 60%;
+}
+
+
+#headerDiv {
+    width:100%;
+    display:flex;
+    border-bottom:solid 1px black;
+    flex-direction: row;  
+    flex-basis: 100%; 
+	flex-shrink: 1;
+}
+
+.menu {
+    flex-basis:70%;
+}
+
+.usermenu {
+    flex-basis:30%;
+    text-align:right;
+}
+
+
+ul.nav {
+    list-style-type: none;
+    margin: 0;
+    padding: 10px;
+}
+
+ul.nav li {
+    display: inline;
+    margin-left: 20px;
+}
+
+ul.nav li a {
+    text-decoration: none;
+    color: #000000;
+    font: 14px/100% arial, sans-serif;
+}
+
+a {
+    text-decoration:none;
+}
+
+.clearfix {
+    content: """";
+    display: table;
+    clear: both;
+}
+
+.floatLeft {
+    float: left;
+}
+
+.floatRight {
+    float: right;
+}
+
+p {
+    padding:7px;
+    margin:2px;
+}
+
+.loggedin {
+    padding: 10px;    
+}
+
+ul.login {
+    list-style-type: none;
+    margin: 0;
+    padding: 10px;
+}
+
+ul.login li {
+    display: inline;
+    margin-left: 10px;
+}
+
+ul.login li a {
+    text-decoration: none;
+    color: #004d00;
+    font: 14px/100% arial, sans-serif;
+}    
+
+.button {
+    background-color: orange;
+    border: 0;
+    color: #000;
+    padding: 5px 10px;
+    border-radius: 3px;
+}    
+
+.spinner {
+    display:none;
+}
+
+
+#popup {
+    position:absolute;
+    right:20px;
+    width:300px;
+    height:50px;
+    border: 1px solid gray;
+    padding:3px;
+    content: """";
+    display:table;
+    clear: both;
+    border-radius:10px;
+    background-color:lightgreen;
+    transition: all 0.5s ease-in-out;
+}
+
+.popupShow {
+    visibility: "visible";
+    opacity: 1;
+    z-index: 101;
+    bottom:20px;
+}
+
+.popupHide {
+    visibility: "none";
+    opacity: 0;
+    z-index: -1;
+    bottom:0px;
+}
+
+#alertMsg {
+    float:left;
+    width:280px;
+    margin-top:15px;
+    text-align:center;
+}
+
+#close {
+  color: green;
+  font: 14px/100% arial, sans-serif;
+  position: absolute;
+  right: 5px;
+  text-shadow: 0 1px 0 #fff;
+  top: 5px;
+}
+
+#close a {
+    text-decoration: none;
+}
+
+table {
+    border-collapse: collapse;
+    border: 1px solid lightgray;
+    table-layout: fixed;
+    width:100%;
+}
+
+
+table tr:nth-child(odd) { 
+      background-color:  #FFFFFF;  
+}
+
+table tr:nth-child(even) { 
+      background-color:  #FFF5E6;
+}
+
+table td:last-child {
+    width: 100%;
+}
+
+th {
+    padding: 10px;
+    text-align: left;
+    border: 1px solid lightgray;
+    background-color: #F2F2F2;
+    overflow:hidden;
+}
+
+td {
+    white-space: nowrap;
+    padding: 10px;
+    overflow:hidden;
+}
+
+tr {
+    border: 1px solid lightgray;
+}
+
+.tableHeader {
+    font-weight:bold;
+}
+.tableFooter {
+    margin-bottom: 20px;
+    font-size:smaller;
+    width:100%;
+}
+
+#submenu {
+    float:left;
+    margin-left:100px;
+}
+
+/* Lets make it small-display friendly */
+@media screen and (max-width:640px)
+{
+    #main { flex-direction: column; }
+    
+    /* On small screens we want the nav to come after the <article> and the <aside> */
+    #main > nav { order: 99; }
+}
+
+

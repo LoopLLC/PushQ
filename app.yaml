@@ -1,0 +1,9 @@
+runtime: go
+api_version: go1
+application: autoloop-pushq-beta
+version: beta-001
+
+handlers:
+- url: /.*
+  script: _go_app
+  secure: always
