@@ -5,6 +5,7 @@ package pushq
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -92,10 +93,14 @@ func TestEnq(t *testing.T) {
 	task.TimeoutSeconds = 5
 	task.URL = APIURL + "/test"
 
+	fmt.Printf("%+v\n", task)
+
 	jsonb, err := json.Marshal(task)
 	if err != nil {
 		t.Fatal("Unable to marshal test task")
 	}
+
+	fmt.Printf("%s\n", string(jsonb))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonb))
 	setAuth(req)
