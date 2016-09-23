@@ -21,8 +21,8 @@ const APITestSecret string = "qMUqFQjIHoCTuKZoHjsPNUXsknzloHfX"
 // Beta Testing
 /*
 const APIURL string = "https://autoloop-pushq-beta.appspot.com"
-const APITestKey string = "yxVSDcoezwUtWxDG"
-const APITestSecret string = "rLmhkhFBZdSkkCSnUrCMpCvBBbVZOJEE"
+const APITestKey string = "VagxTGqWXjdzIzHn"
+const APITestSecret string = "JfgZecGqoiOuIawQQTQzGbPvmoPVAgDq"
 */
 
 // getClient creates an http client that does not follow redirects
