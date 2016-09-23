@@ -8,15 +8,6 @@ body {
     height: 100%;
     margin: 0; 
 }
-#main > nav {
-    background-color: #bbb;
-}
-#main > aside {			
-    background-color: #ddd;
-}
-#main > article {
-    background-color: #fff;
-}
 
 /* NOW FOR THE GOOD STUFF */
 

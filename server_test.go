@@ -3,6 +3,7 @@ package pushq
 // goapp serve in a separate console window before running tests
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -38,6 +39,76 @@ func getClient() *http.Client {
 func setAuth(r *http.Request) {
 	r.Header.Set(XAPIKEY, APITestKey)
 	r.Header.Set(XAPISECRET, APITestSecret)
+}
+
+func TestBadQueueName(t *testing.T) {
+	url := APIURL + "/enq"
+
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	var task Task
+	task.DelaySeconds = 1
+	var headers []TaskHeader
+	task.Headers = headers
+	task.Payload = "ABC"
+	task.QueueName = "InvalidName!"
+	task.TimeoutSeconds = 5
+	task.URL = APIURL + "/test"
+
+	jsonb, err := json.Marshal(task)
+	if err != nil {
+		t.Fatal("Unable to marshal test task")
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonb))
+	setAuth(req)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusNotAcceptable {
+		t.Fatalf("Did not get http.StatusNotAcceptable from %s: %s", url, body)
+	}
+}
+
+func TestEnq(t *testing.T) {
+	url := APIURL + "/enq"
+
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	var task Task
+	task.DelaySeconds = 1
+	var headers []TaskHeader
+	task.Headers = headers
+	task.Payload = "ABC"
+	task.QueueName = "default"
+	task.TimeoutSeconds = 5
+	task.URL = APIURL + "/test"
+
+	jsonb, err := json.Marshal(task)
+	if err != nil {
+		t.Fatal("Unable to marshal test task")
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonb))
+	setAuth(req)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Did not get 200 OK from %s: %s", url, body)
+	}
 }
 
 func TestCounts(t *testing.T) {

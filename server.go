@@ -59,6 +59,8 @@ func init() {
 
 	// REST API
 	muxRouter.HandleFunc("/enq", enq).Methods("POST")
+	muxRouter.HandleFunc("/callback", callback).Methods("POST")
+	muxRouter.HandleFunc("/test", test).Methods("POST")
 	muxRouter.HandleFunc("/counts", getAllCounts).Methods("GET")
 
 	http.Handle("/", muxRouter)
@@ -190,6 +192,20 @@ func enq(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	qNames := map[string]bool{
+		"default":     true,
+		"crm":         true,
+		"campaigns":   true,
+		"integration": true,
+		"reports":     true,
+		"messaging":   true,
+	}
+
+	if !qNames[task.QueueName] {
+		http.Error(w, "Invalid QueueName", http.StatusNotAcceptable)
+		return
+	}
+
 	// Create the task
 	t := taskqueue.Task{}
 	t.Path = "/callback"
@@ -202,6 +218,8 @@ func enq(w http.ResponseWriter, r *http.Request) {
 	if _, err := taskqueue.Add(ctx, &t, task.QueueName); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+
+	incrementCounters(ctx, "Enqueue", time.Now().UTC())
 }
 
 // callback POSTs the task payload to the URL.
@@ -225,7 +243,9 @@ func callback(w http.ResponseWriter, r *http.Request) {
 	log.Debugf(ctx, "callback payload: %+v", task)
 
 	var client = urlfetch.Client(ctx)
-	client.Timeout = time.Second * 1
+	client.Timeout = time.Duration(task.TimeoutSeconds) * time.Second
+
+	// TODO - Headers
 
 	req, err := http.NewRequest("POST", task.URL, bytes.NewBuffer(jsonb))
 	if err != nil {
@@ -247,6 +267,14 @@ func callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Debugf(ctx, "callback got resp: %+v", resp)
+}
+
+func test(w http.ResponseWriter, r *http.Request) {
+
+	ctx := appengine.NewContext(r)
+
+	log.Debugf(ctx, "test called")
+
 }
 
 // CounterTotal is used to pass totals back as JSON from getAllCounts

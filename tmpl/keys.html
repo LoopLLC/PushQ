@@ -1,35 +1,40 @@
 <div id="main">
 
-    <div class="clearfix" style="width:100%">
-        <div class="floatRight" style="padding:5px;">
+    <nav>
+    </nav>
 
-            <a href="#" class="button" 
-                onclick="pushq.newKey()">Create a New API Key</a>
+    <article>
 
+        <div style="display:flex;width:100%">
+            <div style="flex-basis:70%">
+                <h1>API Keys</h1>
+            </div>
+            <div style="padding-top:25px;text-align:right;flex-basis:30%;">
+
+                <a href="#" class="button" onclick="pushq.newKey()">Create a New API Key</a>
+
+            </div>
         </div>
+        <table>
+            <tr>
+                <th>Key</th>
+                <th>Delete</th>
+                <th>&nbsp;</th>
+            </tr>
 
-        <div >
-            <h1>API Keys</h1>
+            {{ range .Keys }}
 
-        </div>
-    </div>
+            <tr>
+                <th>{{.Key}}</th>
+                <th><a class="button" href="#" onclick="pushq.deleteKey('{{.Key}}')">Delete</a></th>
+                <th></th>
+            </tr>
+            {{ end }}
+        </table>
+    </article>
 
-    <table>
-        <tr>
-            <th>Key</th>
-            <th>Delete</th>
-            <th>&nbsp;</th>
-        </tr>
+    <aside>
 
-        {{ range .Keys }}
 
-        <tr>
-            <th>{{.Key}}</th>
-            <th><a class="button" href="#" 
-                onclick="pushq.deleteKey('{{.Key}}')">Delete</a></th>
-            <th></th>
-        </tr>
-        {{ end }}
-    </table>
-
+    </aside>
 </div>
