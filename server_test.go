@@ -5,7 +5,6 @@ package pushq
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -16,8 +15,8 @@ import (
 
 // Local Testing
 const APIURL string = "http://localhost:8080"
-const APITestKey string = "nXCfmjiMXvkDrCow"
-const APITestSecret string = "qMUqFQjIHoCTuKZoHjsPNUXsknzloHfX"
+const APITestKey string = "HNoGuLrPXPEWTPkC"
+const APITestSecret string = "sHXzRppJhsaqXuQzPbbbUfCtytyICNFD"
 
 // Beta Testing
 /*
@@ -93,14 +92,14 @@ func TestEnq(t *testing.T) {
 	task.TimeoutSeconds = 5
 	task.URL = APIURL + "/test"
 
-	fmt.Printf("%+v\n", task)
+	//fmt.Printf("%+v\n", task)
 
 	jsonb, err := json.Marshal(task)
 	if err != nil {
 		t.Fatal("Unable to marshal test task")
 	}
 
-	fmt.Printf("%s\n", string(jsonb))
+	//fmt.Printf("%s\n", string(jsonb))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonb))
 	setAuth(req)
@@ -126,6 +125,8 @@ func TestCounts(t *testing.T) {
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}
+
+	time.Sleep(500 * time.Millisecond) // Wait for counts to persist
 
 	resp, err := client.Do(req)
 	if err != nil {

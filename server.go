@@ -1,5 +1,8 @@
 package pushq
 
+// This file is the entry point to the web application.  It has routing
+// and the REST API functions for enqueuing tasks.
+
 import (
 	"bytes"
 	"html/template"
@@ -184,6 +187,11 @@ func enq(w http.ResponseWriter, r *http.Request) {
 
 	log.Debugf(ctx, "enq called")
 
+	if !auth(ctx, r) {
+		http.Error(w, "Not authorized", http.StatusUnauthorized)
+		return
+	}
+
 	var task Task
 	var jsonb []byte
 	jsonb, _ = ioutil.ReadAll(r.Body)
@@ -212,8 +220,6 @@ func enq(w http.ResponseWriter, r *http.Request) {
 	t.Delay = time.Duration(task.DelaySeconds) * time.Second
 	t.Payload = jsonb // Use the entire submitted task as the payload
 
-	// TODO - Validate queue name
-
 	// Enqueue the task
 	if _, err := taskqueue.Add(ctx, &t, task.QueueName); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -223,15 +229,22 @@ func enq(w http.ResponseWriter, r *http.Request) {
 }
 
 // callback POSTs the task payload to the URL.
-// All callbacks must succeed to get a 200 from this.
 func callback(w http.ResponseWriter, r *http.Request) {
 
 	ctx := appengine.NewContext(r)
 
 	log.Debugf(ctx, "callback called")
 
-	// TODO - How do we auth this?
+	// Look for one of Google's headers: X-AppEngine-QueueName
+	// These headers are removed if an external caller sets them,
+	// so they can be used to make sure the request is valid.
+	xq := r.Header.Get("X-AppEngine-QueueName")
+	if xq == "" {
+		http.Error(w, "Missing required header", 400)
+		return
+	}
 
+	// Unmarshal the task
 	var task Task
 	var jsonb []byte
 	jsonb, _ = ioutil.ReadAll(r.Body)
@@ -242,10 +255,15 @@ func callback(w http.ResponseWriter, r *http.Request) {
 
 	log.Debugf(ctx, "callback payload: %+v", task)
 
+	// Double check the queue name
+	if xq != task.QueueName {
+		http.Error(w, "header QueueName mismatch", 400)
+		return
+	}
+
+	// Initialize the http client
 	var client = urlfetch.Client(ctx)
 	client.Timeout = time.Duration(task.TimeoutSeconds) * time.Second
-
-	// TODO - Headers
 
 	req, err := http.NewRequest("POST", task.URL, bytes.NewBuffer(jsonb))
 	if err != nil {
@@ -255,6 +273,12 @@ func callback(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	// Add custom task headers
+	for _, h := range task.Headers {
+		req.Header.Set(h.Name, h.Value)
+	}
+
+	// Make the request
 	var resp *http.Response
 	if resp, err = client.Do(req); err != nil {
 		log.Debugf(ctx, "Callback client failed: %s", err.Error())
