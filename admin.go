@@ -114,19 +114,75 @@ func failJSON(w http.ResponseWriter, message string) {
 	json.NewEncoder(w).Encode(r)
 }
 
+// QStat is a view model for queue/URL stats
+type QStat struct {
+	Queue    string
+	URL      string
+	Total    int
+	Today    int
+	ErrToday int
+	AvgMS    float32
+}
+
+// AdminPage is a view model for the admin page
+type AdminPage struct {
+	Page
+	NumEnq      int
+	NumEnqToday int
+	NumErrToday int
+	Qs          []*QStat
+	URLs        []*QStat
+}
+
 // admin renders the administrative interface for the server
 func admin(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 
 	log.Debugf(ctx, "admin called")
 
-	p := Page{}
+	p := AdminPage{}
 
-	if !initPage(ctx, w, r, &p) {
+	if !initPage(ctx, w, r, &p.Page) {
 		return
 	}
 
 	p.Title = "Loop PushQ Admin Console"
+	now := time.Now().UTC()
+	nowf := getTodayf(now)
+
+	log.Debugf(ctx, "admin nowf: %s", nowf)
+
+	// Overall Stats
+	var c int
+	var err error
+	if c, err = Count(ctx, EnqCt); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	p.NumEnq = c
+
+	if c, err = Count(ctx, EnqCt+nowf); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	p.NumEnqToday = c
+
+	// Queue Stats
+	qNames := *QNames
+	for qn := range qNames {
+		s := QStat{}
+		s.Queue = qn
+		if c, err = Count(ctx, EnqCt+qn); err == nil {
+			s.Total = c
+		}
+		if c, err = Count(ctx, EnqCt+qn+nowf); err == nil {
+			s.Today = c
+		}
+		p.Qs = append(p.Qs, &s)
+	}
+
+	testurl := QStat{URL: "https://api.autoloop.local/blah", Queue: "default"}
+	p.URLs = append(p.URLs, &testurl)
 
 	renderPage(w, r, p, "admin.html")
 }

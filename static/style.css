@@ -7,6 +7,7 @@ html {
 body {
     height: 100%;
     margin: 0; 
+    font: 14px/100% arial, sans-serif;
 }
 
 /* NOW FOR THE GOOD STUFF */
@@ -62,7 +63,8 @@ footer {
     width:100%;
     display:flex;
     border-bottom:solid 1px black;
-    flex-direction: row;  
+    flex-direction: row;      
+    background-color: gray;
     flex-basis: 100%; 
 	flex-shrink: 1;
 }
@@ -74,6 +76,7 @@ footer {
 .usermenu {
     flex-basis:30%;
     text-align:right;
+    color:white;
 }
 
 
@@ -90,12 +93,30 @@ ul.nav li {
 
 ul.nav li a {
     text-decoration: none;
-    color: #000000;
+    color: orange;
     font: 14px/100% arial, sans-serif;
 }
 
 a {
     text-decoration:none;
+    color: #b36b00;    
+}
+
+a:hover {
+ cursor:pointer;
+}
+
+.headerDiv a {
+    color:orange;
+}
+
+.usermenu a {
+    color:orange;
+}
+
+
+h1,h2,h3,h4 {
+    margin:10px;
 }
 
 .clearfix {
@@ -134,7 +155,7 @@ ul.login li {
 
 ul.login li a {
     text-decoration: none;
-    color: #004d00;
+    color: orange;
     font: 14px/100% arial, sans-serif;
 }    
 
@@ -250,6 +271,12 @@ tr {
 #submenu {
     float:left;
     margin-left:100px;
+}
+
+.drop {
+    -webkit-box-shadow: 5px 5px 5px 0px rgba(204,204,204,1);
+    -moz-box-shadow: 5px 5px 5px 0px rgba(204,204,204,1);
+    box-shadow: 5px 5px 5px 0px rgba(204,204,204,1);
 }
 
 /* Lets make it small-display friendly */

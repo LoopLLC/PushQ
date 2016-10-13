@@ -5,6 +5,7 @@ package pushq
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -15,8 +16,8 @@ import (
 
 // Local Testing
 const APIURL string = "http://localhost:8080"
-const APITestKey string = "HNoGuLrPXPEWTPkC"
-const APITestSecret string = "sHXzRppJhsaqXuQzPbbbUfCtytyICNFD"
+const APITestKey string = "RxnWFNYeWznGjlRJ"
+const APITestSecret string = "rohVMeJCkwCSEamQgvNTBYofGCkTcRwT"
 
 // Beta Testing
 /*
@@ -148,7 +149,7 @@ func TestCounts(t *testing.T) {
 		t.Fatal("Expected totals to have at least one entry")
 	}
 
-	//for _, t := range totals {
-	//	fmt.Println(t.Name, ": ", t.Total)
-	//}
+	for _, t := range totals {
+		fmt.Println(t.Name, ": ", t.Total)
+	}
 }

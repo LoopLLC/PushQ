@@ -44,6 +44,8 @@ type Task struct {
 var templates = template.Must(template.ParseFiles("tmpl/admin.html",
 	"tmpl/header.html", "tmpl/footer.html", "tmpl/keys.html"))
 
+var QNames *map[string]bool
+
 // init initializes the web application by configuring routes
 func init() {
 
@@ -65,6 +67,17 @@ func init() {
 	muxRouter.HandleFunc("/callback", callback).Methods("POST")
 	muxRouter.HandleFunc("/test", test).Methods("POST")
 	muxRouter.HandleFunc("/counts", getAllCounts).Methods("GET")
+
+	qNames := map[string]bool{
+		"default":     true,
+		"crm":         true,
+		"campaigns":   true,
+		"integration": true,
+		"reports":     true,
+		"messaging":   true,
+	}
+
+	QNames = &qNames
 
 	http.Handle("/", muxRouter)
 }
@@ -160,19 +173,14 @@ func genKeySecret(apiKey *APIKey) error {
 
 func incrementCounters(ctx context.Context, name string, now time.Time) {
 
-	countAllName := name + "All"
+	countAllName := name
 
 	// All
 	if err := Increment(ctx, countAllName); err != nil {
 		log.Errorf(ctx, err.Error())
 	}
 
-	localt := now
-	loc, err := time.LoadLocation("America/New_York")
-	if err != nil {
-		localt = now.In(loc)
-	}
-	countTodayName := countAllName + localt.Format(ISO8601D)
+	countTodayName := countAllName + getTodayf(now)
 
 	// Today
 	if err := Increment(ctx, countTodayName); err != nil {
@@ -200,15 +208,7 @@ func enq(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	qNames := map[string]bool{
-		"default":     true,
-		"crm":         true,
-		"campaigns":   true,
-		"integration": true,
-		"reports":     true,
-		"messaging":   true,
-	}
-
+	qNames := *QNames
 	if !qNames[task.QueueName] {
 		http.Error(w, "Invalid QueueName", http.StatusNotAcceptable)
 		return
@@ -223,9 +223,14 @@ func enq(w http.ResponseWriter, r *http.Request) {
 	// Enqueue the task
 	if _, err := taskqueue.Add(ctx, &t, task.QueueName); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		incrementCounters(ctx, "EnqueueError", time.Now().UTC())
+		return
 	}
 
-	incrementCounters(ctx, "Enqueue", time.Now().UTC())
+	nowutc := time.Now().UTC()
+
+	incrementCounters(ctx, EnqCt, nowutc)
+	incrementCounters(ctx, EnqCt+task.QueueName, nowutc)
 }
 
 // callback POSTs the task payload to the URL.

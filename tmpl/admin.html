@@ -1,11 +1,95 @@
-
 <div id="main">
-    
-<nav></nav>
+	<style>
+        #statContainer {
+			margin: auto;
 
-<article>...</article>
+        }
+		.stats {
+			width: 900px;
+			display: flex;
+		}
+		
+		.card {
+			width: 300px;
+			background-color: lightgray;
+			border: 1px solid black;
+			margin: 20px;
+		}
+	</style>
+    <div id="statContainer">
 
-<aside></aside>
+	<div class="stats">
+
+		<div class="card drop">
+
+			<h3>Overall Stats</h3>
+			<table>
+				<tr>
+					<th>Stat</th>
+					<th>Total</th>
+				</tr>
+
+				<tr>
+					<td>Enqueued Total</td>
+					<td>{{ .NumEnq }}</td>
+				</tr>
+				<tr>
+					<td>Enqueued Today</td>
+					<td>{{ .NumEnqToday }}</td>
+				</tr>
+				<tr>
+					<td>Errors Today</td>
+					<td>{{ .NumErrToday }}</td>
+				</tr>
+			</table>
+
+		</div>
 
 
+		<div class="card drop" style="width:400px;">
+			<h3>Queues</h3>
+			<table>
+				<tr>
+					<th>Queue</th>
+					<th>Total</th>
+					<th>Today</th>
+					<th>Avg MS</th>
+				</tr>
+				{{ range .Qs }}
+				<tr>
+					<td>{{ .Queue }}</td>
+					<td>{{ .Total }}</td>
+					<td>{{ .Today }}
+						<span style="color:red;">({{ .ErrToday }})</span></td>
+					<td>{{ .AvgMS }}</td>
+				</tr>
+				{{- end}}
+			</table>
+		</div>
+	</div>
+	<div class="stats">
+		<div class="card drop" style="width:800px;">
+			<h3>URLs</h3>
+			<table>
+				<tr>
+					<th style="width:200px;">URL</th>
+					<th>Queue</th>
+					<th>Total</th>
+					<th>Today</th>
+					<th>Avg MS</th>
+				</tr>
+				{{ range .URLs }}
+				<tr>
+					<td>{{ .URL }}</td>
+					<td>{{ .Queue }}</td>
+					<td>{{ .Total }}</td>
+					<td>{{ .Today }}
+						<span style="color:red;">({{ .ErrToday }})</span></td>
+					<td>{{ .AvgMS }}</td>
+				</tr>
+				{{- end}}
+			</table>
+		</div>
+	</div>
+    </div>
 </div>
