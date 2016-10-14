@@ -57,11 +57,11 @@
 				</tr>
 				{{ range .Qs }}
 				<tr>
-					<td>{{ .Queue }}</td>
+					<td>{{ .Name }}</td>
 					<td>{{ .Total }}</td>
 					<td>{{ .Today }}
 						<span style="color:red;">({{ .ErrToday }})</span></td>
-					<td>{{ .AvgMS }}</td>
+					<td>{{ .AvgMS | fmtms }}</td>
 				</tr>
 				{{- end}}
 			</table>
@@ -73,19 +73,17 @@
 			<table>
 				<tr>
 					<th style="width:200px;">URL</th>
-					<th>Queue</th>
 					<th>Total</th>
 					<th>Today</th>
 					<th>Avg MS</th>
 				</tr>
 				{{ range .URLs }}
 				<tr>
-					<td>{{ .URL }}</td>
-					<td>{{ .Queue }}</td>
+					<td>{{ .Name }}</td>
 					<td>{{ .Total }}</td>
 					<td>{{ .Today }}
 						<span style="color:red;">({{ .ErrToday }})</span></td>
-					<td>{{ .AvgMS }}</td>
+					<td>{{ .AvgMS | fmtms }}</td>
 				</tr>
 				{{- end}}
 			</table>

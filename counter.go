@@ -22,7 +22,7 @@ type counterConfig struct {
 
 type counterShard struct {
 	Name  string
-	Count int
+	Count int64
 }
 
 const (
@@ -36,8 +36,8 @@ func memcacheKey(name string) string {
 }
 
 // Count retrieves the value of the named counter.
-func Count(ctx context.Context, name string) (int, error) {
-	total := 0
+func Count(ctx context.Context, name string) (int64, error) {
+	var total int64
 	mkey := memcacheKey(name)
 	if _, err := memcache.JSON.Get(ctx, mkey, &total); err == nil {
 		return total, nil
@@ -63,7 +63,7 @@ func Count(ctx context.Context, name string) (int, error) {
 }
 
 // Increment increments the named counter.
-func Increment(ctx context.Context, name string) error {
+func Increment(ctx context.Context, name string, by int64) error {
 	// Get counter config.
 	var cfg counterConfig
 	ckey := datastore.NewKey(ctx, configKind, name, 0, nil)
@@ -88,7 +88,7 @@ func Increment(ctx context.Context, name string) error {
 			return err
 		}
 		s.Name = name
-		s.Count++
+		s.Count += by
 		_, err = datastore.Put(ctx, key, &s)
 		return err
 	}, nil)

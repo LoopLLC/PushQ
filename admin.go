@@ -116,20 +116,20 @@ func failJSON(w http.ResponseWriter, message string) {
 
 // QStat is a view model for queue/URL stats
 type QStat struct {
-	Queue    string
-	URL      string
-	Total    int
-	Today    int
-	ErrToday int
+	// Name is the queue name or the URL
+	Name     string
+	Total    int64
+	Today    int64
+	ErrToday int64
 	AvgMS    float32
 }
 
 // AdminPage is a view model for the admin page
 type AdminPage struct {
 	Page
-	NumEnq      int
-	NumEnqToday int
-	NumErrToday int
+	NumEnq      int64
+	NumEnqToday int64
+	NumErrToday int64
 	Qs          []*QStat
 	URLs        []*QStat
 }
@@ -153,7 +153,7 @@ func admin(w http.ResponseWriter, r *http.Request) {
 	log.Debugf(ctx, "admin nowf: %s", nowf)
 
 	// Overall Stats
-	var c int
+	var c int64
 	var err error
 	if c, err = Count(ctx, EnqCt); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -167,24 +167,56 @@ func admin(w http.ResponseWriter, r *http.Request) {
 	}
 	p.NumEnqToday = c
 
+	if c, err = Count(ctx, ErrCt+nowf); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	p.NumErrToday = c
+
 	// Queue Stats
 	qNames := *QNames
 	for qn := range qNames {
 		s := QStat{}
-		s.Queue = qn
-		if c, err = Count(ctx, EnqCt+qn); err == nil {
-			s.Total = c
-		}
-		if c, err = Count(ctx, EnqCt+qn+nowf); err == nil {
-			s.Today = c
-		}
+		s.Name = qn
+		getStats(ctx, &s, s.Name, nowf)
 		p.Qs = append(p.Qs, &s)
 	}
 
-	testurl := QStat{URL: "https://api.autoloop.local/blah", Queue: "default"}
-	p.URLs = append(p.URLs, &testurl)
+	q := datastore.NewQuery(AllURLsKind)
+	var urls []AllURLs
+	if _, err := q.GetAll(ctx, &urls); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for _, url := range urls {
+		s := QStat{}
+		s.Name = url.URL
+		getStats(ctx, &s, s.Name, nowf)
+		p.URLs = append(p.URLs, &s)
+	}
 
 	renderPage(w, r, p, "admin.html")
+}
+
+func getStats(ctx context.Context, s *QStat, name string, nowf string) {
+	var c int64
+	var err error
+	if c, err = Count(ctx, EnqCt+name); err == nil {
+		s.Total = c
+	}
+	if c, err = Count(ctx, EnqCt+name+nowf); err == nil {
+		s.Today = c
+	}
+	if c, err = Count(ctx, ErrCt+name+nowf); err == nil {
+		s.ErrToday = c
+	}
+	if c, err = Count(ctx, AvgTotalCt+name+nowf); err == nil {
+		if accum, err := Count(ctx, AvgAccumCt+s.Name+nowf); err == nil {
+			if c > 0 {
+				s.AvgMS = float32(accum) / float32(c)
+			}
+		}
+	}
 }
 
 // keys renders the API Keys admin page

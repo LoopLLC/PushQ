@@ -16,8 +16,8 @@ import (
 
 // Local Testing
 const APIURL string = "http://localhost:8080"
-const APITestKey string = "RxnWFNYeWznGjlRJ"
-const APITestSecret string = "rohVMeJCkwCSEamQgvNTBYofGCkTcRwT"
+const APITestKey string = "rCtaSPwlKhbIayPW"
+const APITestSecret string = "lofqeqBMuIABFAiwIGWPXucqutPRqCuh"
 
 // Beta Testing
 /*
@@ -98,6 +98,45 @@ func TestEnq(t *testing.T) {
 	jsonb, err := json.Marshal(task)
 	if err != nil {
 		t.Fatal("Unable to marshal test task")
+	}
+
+	//fmt.Printf("%s\n", string(jsonb))
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonb))
+	setAuth(req)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Did not get 200 OK from %s: %s", url, body)
+	}
+}
+
+func TestEnqErr(t *testing.T) {
+	url := APIURL + "/enq"
+
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	var task Task
+	task.DelaySeconds = 1
+	var headers []TaskHeader
+	task.Headers = headers
+	task.Payload = "XYZ"
+	task.QueueName = "crm"
+	task.TimeoutSeconds = 5
+	task.URL = APIURL + "/testerr"
+
+	//fmt.Printf("%+v\n", task)
+
+	jsonb, err := json.Marshal(task)
+	if err != nil {
+		t.Fatal("Unable to marshal testerr task")
 	}
 
 	//fmt.Printf("%s\n", string(jsonb))

@@ -40,11 +40,10 @@ type Task struct {
 	TimeoutSeconds int          `datastore:"t" json:"timeoutSeconds"`
 }
 
-// Cache templates
-var templates = template.Must(template.ParseFiles("tmpl/admin.html",
-	"tmpl/header.html", "tmpl/footer.html", "tmpl/keys.html"))
-
+// QNames is the list of queues, which should match queue.yaml
 var QNames *map[string]bool
+
+var templates *template.Template
 
 // init initializes the web application by configuring routes
 func init() {
@@ -66,6 +65,7 @@ func init() {
 	muxRouter.HandleFunc("/enq", enq).Methods("POST")
 	muxRouter.HandleFunc("/callback", callback).Methods("POST")
 	muxRouter.HandleFunc("/test", test).Methods("POST")
+	muxRouter.HandleFunc("/testerr", testerr).Methods("POST")
 	muxRouter.HandleFunc("/counts", getAllCounts).Methods("GET")
 
 	qNames := map[string]bool{
@@ -78,6 +78,15 @@ func init() {
 	}
 
 	QNames = &qNames
+
+	funcMap := template.FuncMap{
+		"fmtms": fmtms,
+	}
+
+	// Cache templates
+	templates = template.Must(
+		template.New("all").Funcs(funcMap).ParseFiles("tmpl/admin.html",
+			"tmpl/header.html", "tmpl/footer.html", "tmpl/keys.html"))
 
 	http.Handle("/", muxRouter)
 }
@@ -102,6 +111,14 @@ const ISO8601D string = "2006-01-02"
 
 // APIKeyKind is the name of the datastore Kind (table) for keys
 const APIKeyKind string = "APIKey"
+
+// AllURLsKind is the name of the datastore Kind for URLs
+const AllURLsKind string = "AllURLs"
+
+// AllURLs is used to store a record of all URLs used as the callback for tasks
+type AllURLs struct {
+	URL string
+}
 
 // APIKey is a record that stores the secret hash and other information
 // about the API account to manage access to the REST API.
@@ -171,19 +188,20 @@ func genKeySecret(apiKey *APIKey) error {
 	return nil
 }
 
-func incrementCounters(ctx context.Context, name string, now time.Time) {
+func incrementCounters(ctx context.Context,
+	name string, now time.Time, by int64) {
 
 	countAllName := name
 
 	// All
-	if err := Increment(ctx, countAllName); err != nil {
+	if err := Increment(ctx, countAllName, by); err != nil {
 		log.Errorf(ctx, err.Error())
 	}
 
 	countTodayName := countAllName + getTodayf(now)
 
 	// Today
-	if err := Increment(ctx, countTodayName); err != nil {
+	if err := Increment(ctx, countTodayName, by); err != nil {
 		log.Errorf(ctx, err.Error())
 	}
 }
@@ -220,17 +238,41 @@ func enq(w http.ResponseWriter, r *http.Request) {
 	t.Delay = time.Duration(task.DelaySeconds) * time.Second
 	t.Payload = jsonb // Use the entire submitted task as the payload
 
+	// If we are testing errors, only retry once
+	if task.URL == "http://localhost:8080/testerr" {
+		ro := taskqueue.RetryOptions{}
+		ro.RetryLimit = 1
+		t.RetryOptions = &ro
+	}
+
 	// Enqueue the task
 	if _, err := taskqueue.Add(ctx, &t, task.QueueName); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		incrementCounters(ctx, "EnqueueError", time.Now().UTC())
+		incrementCounters(ctx, "EnqueueError", time.Now().UTC(), 1)
 		return
 	}
 
 	nowutc := time.Now().UTC()
 
-	incrementCounters(ctx, EnqCt, nowutc)
-	incrementCounters(ctx, EnqCt+task.QueueName, nowutc)
+	incrementCounters(ctx, EnqCt, nowutc, 1)
+	incrementCounters(ctx, EnqCt+task.QueueName, nowutc, 1)
+	incrementCounters(ctx, EnqCt+task.URL, nowutc, 1)
+	recordURL(ctx, task.URL)
+}
+
+// recordURL saves the URL so that we can get a list of all unique URLs
+// used as the callback for enqueued tasks.
+func recordURL(ctx context.Context, url string) {
+	k := datastore.NewKey(ctx, AllURLsKind, url, 0, nil)
+	apiKey := APIKey{}
+	if err := datastore.Get(ctx, k, &apiKey); err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			u := AllURLs{URL: url}
+			if _, err = datastore.Put(ctx, k, &u); err != nil {
+				log.Debugf(ctx, "Unable to record AlURLs: %s", url)
+			}
+		}
+	}
 }
 
 // callback POSTs the task payload to the URL.
@@ -285,17 +327,35 @@ func callback(w http.ResponseWriter, r *http.Request) {
 
 	// Make the request
 	var resp *http.Response
+	before := time.Now().UTC()
 	if resp, err = client.Do(req); err != nil {
 		log.Debugf(ctx, "Callback client failed: %s", err.Error())
 		http.Error(w, "Callback Failed", 400)
 		return
 	} else if resp.StatusCode != http.StatusOK {
 		log.Debugf(ctx, "Callback failed: %s", resp.Status)
+		nowutc := time.Now().UTC()
+		incrementCounters(ctx, ErrCt, nowutc, 1)
+		incrementCounters(ctx, ErrCt+task.URL, nowutc, 1)
+		incrementCounters(ctx, ErrCt+task.QueueName, nowutc, 1)
 		http.Error(w, "Callback Failed", 400)
 		return
 	}
 
-	log.Debugf(ctx, "callback got resp: %+v", resp)
+	// Elapsed time
+	after := time.Now().UTC()
+	diff := after.Sub(before)
+	elapsedNs := diff.Nanoseconds()
+	ms := elapsedNs / int64(1000000)
+
+	// Store elapsed time for average calculations
+	nowutc := time.Now().UTC()
+	incrementCounters(ctx, AvgTotalCt+task.URL, nowutc, 1)
+	incrementCounters(ctx, AvgAccumCt+task.URL, nowutc, ms)
+	incrementCounters(ctx, AvgTotalCt+task.QueueName, nowutc, 1)
+	incrementCounters(ctx, AvgAccumCt+task.QueueName, nowutc, ms)
+
+	log.Debugf(ctx, "callback got resp in %dns: %+v", elapsedNs, resp)
 }
 
 func test(w http.ResponseWriter, r *http.Request) {
@@ -306,10 +366,19 @@ func test(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func testerr(w http.ResponseWriter, r *http.Request) {
+
+	ctx := appengine.NewContext(r)
+
+	log.Debugf(ctx, "testerr called")
+
+	http.Error(w, "testerr", 400)
+}
+
 // CounterTotal is used to pass totals back as JSON from getAllCounts
 type CounterTotal struct {
 	Name  string
-	Total int
+	Total int64
 }
 
 func getAllCounts(w http.ResponseWriter, r *http.Request) {
@@ -326,7 +395,7 @@ func getAllCounts(w http.ResponseWriter, r *http.Request) {
 
 	for _, counterName := range counterNames {
 		total := CounterTotal{Name: counterName}
-		var c int
+		var c int64
 		var err error
 		if c, err = Count(ctx, counterName); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
