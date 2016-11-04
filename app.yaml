@@ -1,7 +1,7 @@
 runtime: go
 api_version: go1
-application: autoloop-pushq-beta
-version: beta-002
+application: autoloop-pushq-staging
+version: release-001
 
 handlers:
 - url: /.*

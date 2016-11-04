@@ -242,9 +242,11 @@ Pushq.prototype.newKey = function() {
     pushq.getApiData("newapikey", 
     function(r) {
         var data = r.data;
-        pushq.alert("(This is the last time you will see the Secret) Key: " + 
-            data.Key + ", Secret: " + data.Secret, 
+        pushq.alert("This is the last time you will see the Secret, so be sure to store it securely now", 
         "alert");
+        var el = pushq.id("showkey");
+        el.innerText = "Key: " + 
+            data.Key + ", Secret: " + data.Secret;
     }, 
     function(msg) {
         pushq.alert(msg, "error");

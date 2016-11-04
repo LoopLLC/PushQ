@@ -15,16 +15,17 @@ import (
 // TODO - Automate creation of this key and secret... securely?
 
 // Local Testing
-/*
-const APIURL string = "http://localhost:8080"
-const APITestKey string = "rCtaSPwlKhbIayPW"
-const APITestSecret string = "lofqeqBMuIABFAiwIGWPXucqutPRqCuh"
-*/
 
-// Beta Testing
-const APIURL string = "https://autoloop-pushq-beta.appspot.com"
-const APITestKey string = "VagxTGqWXjdzIzHn"
-const APITestSecret string = "JfgZecGqoiOuIawQQTQzGbPvmoPVAgDq"
+const APIURL string = "http://localhost:8080"
+const APITestKey string = "drUZdgtbsWXDGHWG"
+const APITestSecret string = "ZCXWlCoZanUvHufeESVMxXwFEeJcisNr"
+
+// Beta/Staging/Prod Testing
+/*
+const APIURL string = "https://autoloop-pushq-staging.appspot.com"
+const APITestKey string = "WcShKtkYkAeOEdAa"
+const APITestSecret string = "BHLnRXAdOLbsKjMqzBSZVuWgYmIIaMmf"
+*/
 
 // getClient creates an http client that does not follow redirects
 func getClient() *http.Client {

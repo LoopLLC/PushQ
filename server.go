@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"math/rand"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/net/context"
@@ -239,7 +240,7 @@ func enq(w http.ResponseWriter, r *http.Request) {
 	t.Payload = jsonb // Use the entire submitted task as the payload
 
 	// If we are testing errors, only retry once
-	if task.URL == "http://localhost:8080/testerr" {
+	if strings.HasSuffix(task.URL, "testerr") {
 		ro := taskqueue.RetryOptions{}
 		ro.RetryLimit = 1
 		t.RetryOptions = &ro
