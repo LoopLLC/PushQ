@@ -41,6 +41,27 @@ type Task struct {
 	TimeoutSeconds int          `datastore:"t" json:"timeoutSeconds"`
 }
 
+// APIResponse is serialized to json for success and some error responses
+type APIResponse struct {
+	OK      bool        `json:"ok"`
+	Message string      `json:"msg"`
+	Data    interface{} `json:"data"`
+}
+
+// okJSON writes a success response
+func okJSON(w http.ResponseWriter, data interface{}) {
+	r := APIResponse{OK: true, Message: "OK", Data: data}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(r)
+}
+
+// failJSON writes a failure response
+func failJSON(w http.ResponseWriter, message string) {
+	r := APIResponse{OK: false, Message: message, Data: message}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(r)
+}
+
 // QNames is the list of queues, which should match queue.yaml
 var QNames *map[string]bool
 
@@ -123,6 +144,7 @@ type AllURLs struct {
 
 // APIKey is a record that stores the secret hash and other information
 // about the API account to manage access to the REST API.
+// (This isn't actually a cryptographic key, it's just a username/password)
 type APIKey struct {
 	Key        string
 	Secret     string `datastore:"-"`
@@ -385,6 +407,11 @@ type CounterTotal struct {
 func getAllCounts(w http.ResponseWriter, r *http.Request) {
 
 	ctx := appengine.NewContext(r)
+
+	if !auth(ctx, r) {
+		http.Error(w, "Not authorized", http.StatusUnauthorized)
+		return
+	}
 
 	counterNames, err := GetAllCounterNames(ctx)
 	if err != nil {

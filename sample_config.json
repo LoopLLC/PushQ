@@ -1,0 +1,16 @@
+{
+    "Environments": [
+        {
+            "EnvName": "local",
+            "APIURL": "http://localhost:8080",
+            "APITestKey":    "",
+	        "APITestSecret": ""
+        },
+        {
+            "EnvName": "staging",
+            "APIURL": "https://autoloop-pushq-staging.appspot.com",
+            "APITestKey":    "",
+	        "APITestSecret": ""
+        }
+    ]
+}

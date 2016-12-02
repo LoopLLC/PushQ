@@ -83,7 +83,7 @@ func initPage(ctx context.Context,
 	}
 
 	p.Name = u.String()
-	p.SiteName = "Loop PushQ"
+	p.SiteName = "Loop PushQ" // TODO - Config
 
 	return true
 }
@@ -91,27 +91,6 @@ func initPage(ctx context.Context,
 func pageFail(w http.ResponseWriter, message string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintf(w, "%s\r\n", message)
-}
-
-// APIResponse is serialized to json for success and some error responses
-type APIResponse struct {
-	OK      bool        `json:"ok"`
-	Message string      `json:"msg"`
-	Data    interface{} `json:"data"`
-}
-
-// okJSON writes a success response
-func okJSON(w http.ResponseWriter, data interface{}) {
-	r := APIResponse{OK: true, Message: "OK", Data: data}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(r)
-}
-
-// failJSON writes a failure response
-func failJSON(w http.ResponseWriter, message string) {
-	r := APIResponse{OK: false, Message: message, Data: message}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(r)
 }
 
 // QStat is a view model for queue/URL stats

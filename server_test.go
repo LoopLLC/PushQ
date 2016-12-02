@@ -1,6 +1,9 @@
 package pushq
 
-// goapp serve in a separate console window before running tests
+// First create config.json.
+// goapp serve in a separate console window before running tests.
+// go test to test localhost
+// go test -args [env] to test an environment configured in config.json
 
 import (
 	"bytes"
@@ -8,24 +11,70 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 )
 
-// TODO - Automate creation of this key and secret... securely?
+// Environment is a config entry for running tests against local, beta, etc.
+type Environment struct {
+	EnvName       string
+	APIURL        string
+	APITestKey    string
+	APITestSecret string
+}
 
-// Local Testing
+// Config represents config.json
+type Config struct {
+	Environments []Environment
+}
 
-const APIURL string = "http://localhost:8080"
-const APITestKey string = "drUZdgtbsWXDGHWG"
-const APITestSecret string = "ZCXWlCoZanUvHufeESVMxXwFEeJcisNr"
+var config Config
+var testEnv Environment
 
-// Beta/Staging/Prod Testing
-/*
-const APIURL string = "https://autoloop-pushq-staging.appspot.com"
-const APITestKey string = "WcShKtkYkAeOEdAa"
-const APITestSecret string = "BHLnRXAdOLbsKjMqzBSZVuWgYmIIaMmf"
-*/
+func init() {
+
+	// Read the config file
+	fb, err := ioutil.ReadFile("config.json")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	// Parse it
+	err = json.Unmarshal(fb, &config)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	var localEnv Environment
+
+	// Check for local environment in the config file
+	for _, env := range config.Environments {
+		if env.EnvName == "local" {
+			localEnv = env
+		}
+	}
+	if localEnv.EnvName == "" {
+		fmt.Println("config.json missing local environment")
+		return
+	}
+
+	args := os.Args // e.g. go test -args beta
+	if len(args) == 2 {
+		for _, env := range config.Environments {
+			if env.EnvName == args[1] {
+				testEnv = env
+			}
+		}
+	}
+
+	// Default to local to handle "go test" with no args
+	if testEnv.EnvName == "" {
+		testEnv = localEnv
+	}
+}
 
 // getClient creates an http client that does not follow redirects
 func getClient() *http.Client {
@@ -39,12 +88,12 @@ func getClient() *http.Client {
 }
 
 func setAuth(r *http.Request) {
-	r.Header.Set(XAPIKEY, APITestKey)
-	r.Header.Set(XAPISECRET, APITestSecret)
+	r.Header.Set(XAPIKEY, testEnv.APITestKey)
+	r.Header.Set(XAPISECRET, testEnv.APITestSecret)
 }
 
 func TestBadQueueName(t *testing.T) {
-	url := APIURL + "/enq"
+	url := testEnv.APIURL + "/enq"
 
 	client := &http.Client{
 		Timeout: time.Second * 10,
@@ -57,7 +106,7 @@ func TestBadQueueName(t *testing.T) {
 	task.Payload = "ABC"
 	task.QueueName = "InvalidName!"
 	task.TimeoutSeconds = 5
-	task.URL = APIURL + "/test"
+	task.URL = testEnv.APIURL + "/test"
 
 	jsonb, err := json.Marshal(task)
 	if err != nil {
@@ -79,7 +128,7 @@ func TestBadQueueName(t *testing.T) {
 }
 
 func TestEnq(t *testing.T) {
-	url := APIURL + "/enq"
+	url := testEnv.APIURL + "/enq"
 
 	client := &http.Client{
 		Timeout: time.Second * 10,
@@ -92,7 +141,7 @@ func TestEnq(t *testing.T) {
 	task.Payload = "ABC"
 	task.QueueName = "default"
 	task.TimeoutSeconds = 5
-	task.URL = APIURL + "/test"
+	task.URL = testEnv.APIURL + "/test"
 
 	//fmt.Printf("%+v\n", task)
 
@@ -118,7 +167,7 @@ func TestEnq(t *testing.T) {
 }
 
 func TestEnqErr(t *testing.T) {
-	url := APIURL + "/enq"
+	url := testEnv.APIURL + "/enq"
 
 	client := &http.Client{
 		Timeout: time.Second * 10,
@@ -131,7 +180,7 @@ func TestEnqErr(t *testing.T) {
 	task.Payload = "XYZ"
 	task.QueueName = "crm"
 	task.TimeoutSeconds = 5
-	task.URL = APIURL + "/testerr"
+	task.URL = testEnv.APIURL + "/testerr"
 
 	//fmt.Printf("%+v\n", task)
 
@@ -157,7 +206,7 @@ func TestEnqErr(t *testing.T) {
 }
 
 func TestCounts(t *testing.T) {
-	url := APIURL + "/counts"
+	url := testEnv.APIURL + "/counts"
 
 	req, err := http.NewRequest("GET", url, nil)
 	setAuth(req)
