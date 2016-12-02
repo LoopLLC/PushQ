@@ -1,0 +1,77 @@
+<style>
+    #logs {
+        margin: 10px;
+        padding: 10px;
+        font-size: small;
+    }
+    
+    #logContainer {
+        display: flex;
+        flex-direction: row;
+    }
+    
+    #filter {
+        flex-basis: 15%;
+    }
+    
+    #logTableContainer {
+        flex-basis: 85%;
+    }
+
+    .selection {
+        padding:5px;
+    }
+</style>
+<div id="logs">
+    <h1>Logs for {{ .QueueName }}</h1>
+
+    <div id="logContainer">
+        <div id="filter">
+            <h3>Filters</h3>
+
+            <form id="logForm">
+                <div class="selection">
+                    <select id="selectType">
+                        <option value="">Any Log Type</option>
+                    </select>
+                </div>
+                <div class="selection">
+                    <select id="selectURL">
+                        <option value="">Any URL</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+        <div id="logTableContainer">
+            <table class="logTable">
+                <tr>
+                    <th style="width:150px">Log Type</th>
+                    <th style="width:200px">URL</th>
+                    <th style="width:50px">Delay</th>
+                    <th style="width:75px">Payload</th>
+                    <th style="width:75px">Headers</th>
+                    <th style="width:50px">TO</th>
+                    <th style="width:225px">UTC</th>
+                    <th style="width:100px">Code</th>
+                    <th style="width:200px">Message</th>
+                    <th></th>
+                </tr>
+                {{- range .Logs }}
+                <tr>
+                    <td>{{.LogType}}</td>
+                    <td>{{.URL}}</td>
+                    <td>{{.DelaySeconds}}</td>
+                    <td>Payload</td>
+                    <td>Headers</td>
+                    <td>{{.TimeoutSeconds}}</td>
+                    <td>{{.UTC | fmtutc}}</td>
+                    <td>{{.Code}}</td>
+                    <td>{{.Message}}</td>
+                    <td></td>
+                </tr>
+                {{- end }}
+            </table>
+        </div>
+    </div>
+
+</div>

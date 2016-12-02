@@ -10,48 +10,26 @@ body {
     font: 14px/100% arial, sans-serif;
 }
 
-/* NOW FOR THE GOOD STUFF */
-
 body {
-    /* I'm a Flexbox */
     display: flex;
-    
-    /* It is kinda unintuitive but 'column' means treat children like rows. */
     flex-direction: column; 
 } 
 header, footer {
-    /* "flex-basis" controls height when the element is a row like these */
     flex-basis: 50px; 
 }
 footer {
     text-align:center;
 }
 #main {
-    /* I'm a Flexbox too. */
     display: flex; 
-    
-    /* We want this element to take as much height as possible */
     flex-basis: 100%; 
-    
-    /* BUT we want to allow it to shrink if it can't take up all 100% - which it can't */
-    /* We actually don't have to set this. 1 is the default. 
-    flex-shrink: 1; */
-    
-    /* Again, unintuitive. We want to treat children like columns. 
-        You have to set flex-direction everytime you want to change directions. */
     flex-direction: row;  
 }
 #main > aside, 
 #main > nav {
-    /* "flex-basis controls width when the element is a column like these. 
-        We only want the <aside> and <nav> elements to take up 20% of the 
-        width of their parent */
     flex-basis: 20%;
 }
 #main > nav {
-    /* This is kinda cool. In the markup the <article> element comes before 
-        the <nav> element. We normally want the <nav> element to display before 
-        the article, so we reorder the <nav> to be first. */
     order: -1; 
 }
 #main > article {
@@ -279,12 +257,10 @@ tr {
     box-shadow: 5px 5px 5px 0px rgba(204,204,204,1);
 }
 
-/* Lets make it small-display friendly */
 @media screen and (max-width:640px)
 {
     #main { flex-direction: column; }
     
-    /* On small screens we want the nav to come after the <article> and the <aside> */
     #main > nav { order: 99; }
 }
 

@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
+
 	"golang.org/x/net/context"
 
 	"google.golang.org/appengine"
@@ -33,6 +35,27 @@ type KeysPage struct {
 	Keys []APIKey
 }
 
+// APIResponse is serialized to json for success and some error responses
+type APIResponse struct {
+	OK      bool        `json:"ok"`
+	Message string      `json:"msg"`
+	Data    interface{} `json:"data"`
+}
+
+// okJSON writes a success response
+func okJSON(w http.ResponseWriter, data interface{}) {
+	r := APIResponse{OK: true, Message: "OK", Data: data}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(r)
+}
+
+// failJSON writes a failure response
+func failJSON(w http.ResponseWriter, message string) {
+	r := APIResponse{OK: false, Message: message, Data: message}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(r)
+}
+
 // renderPage renders a standard header-body-footer page
 func renderPage(w http.ResponseWriter, r *http.Request, model interface{},
 	bodyTemplate string) {
@@ -55,6 +78,8 @@ func renderPage(w http.ResponseWriter, r *http.Request, model interface{},
 
 // initPage checks auth and returns false if the page should not be rendered.
 // This auth is for the admin console, not for the REST API.
+// It is also called from the admin console's API functions to check auth,
+// even though they aren't actually pages.
 func initPage(ctx context.Context,
 	w http.ResponseWriter, r *http.Request, p *Page) bool {
 
@@ -93,15 +118,21 @@ func pageFail(w http.ResponseWriter, message string) {
 	fmt.Fprintf(w, "%s\r\n", message)
 }
 
-// QStat is a view model for queue/URL stats
+// QStat is a view model for queue/URL stats and config
 type QStat struct {
 	// Name is the queue name or the URL
-	Name     string
-	Total    int64
-	Today    int64
-	ErrToday int64
-	AvgMS    float32
+	Name        string
+	Total       int64
+	Today       int64
+	ErrToday    int64
+	AvgMS       float32
+	LogsEnabled bool
+	Active      bool
+	UpdatedOn   time.Time
 }
+
+// QStatKind is the name of the datastore table for queue stats
+const QStatKind string = "QStat"
 
 // AdminPage is a view model for the admin page
 type AdminPage struct {
@@ -170,16 +201,48 @@ func admin(w http.ResponseWriter, r *http.Request) {
 	for _, url := range urls {
 		s := QStat{}
 		s.Name = url.URL
-		getStats(ctx, &s, s.Name, nowf)
+		if err = getStats(ctx, &s, s.Name, nowf); err != nil {
+			pageFail(w, err.Error())
+			return
+		}
 		p.URLs = append(p.URLs, &s)
 	}
 
 	renderPage(w, r, p, "admin.html")
 }
 
-func getStats(ctx context.Context, s *QStat, name string, nowf string) {
+func getOrCreateQStat(ctx context.Context, s *QStat, name string) error {
+	var err error
+	key := datastore.NewKey(ctx, QStatKind, name, 0, nil)
+	err = datastore.Get(ctx, key, s)
+	if err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			s.Active = true
+			s.LogsEnabled = false
+			s.Name = name
+			if _, err := datastore.Put(ctx, key, s); err != nil {
+				return err
+			}
+		} else if isErrFieldMismatch(err) {
+			// Ignore?
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
+func getStats(ctx context.Context, s *QStat, name string, nowf string) error {
+
 	var c int64
 	var err error
+
+	// First look for the latest stored copy of stats, which also
+	// has config entries.
+	if err = getOrCreateQStat(ctx, s, name); err != nil {
+		return err
+	}
+
 	if c, err = Count(ctx, EnqCt+name); err == nil {
 		s.Total = c
 	}
@@ -196,6 +259,16 @@ func getStats(ctx context.Context, s *QStat, name string, nowf string) {
 			}
 		}
 	}
+
+	s.UpdatedOn = time.Now().UTC()
+
+	// Now re-save the latest stats, retaining config entries
+	key := datastore.NewKey(ctx, QStatKind, name, 0, nil)
+	if _, err := datastore.Put(ctx, key, s); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // keys renders the API Keys admin page
@@ -228,6 +301,11 @@ func newAPIKey(w http.ResponseWriter, r *http.Request) {
 
 	log.Debugf(ctx, "newAPIKey called")
 
+	var p Page
+	if !initPage(ctx, w, r, &p) {
+		return
+	}
+
 	// Generate the key
 	ak := APIKey{}
 	if err := genKeySecret(&ak); err != nil {
@@ -249,6 +327,11 @@ func delAPIKey(w http.ResponseWriter, r *http.Request) {
 
 	log.Debugf(ctx, "delAPIKey called")
 
+	var p Page
+	if !initPage(ctx, w, r, &p) {
+		return
+	}
+
 	// Decode the POST body
 	decoder := json.NewDecoder(r.Body)
 	var ak APIKey
@@ -267,4 +350,83 @@ func delAPIKey(w http.ResponseWriter, r *http.Request) {
 	time.Sleep(500 * time.Millisecond)
 
 	okJSON(w, ak)
+}
+
+// toggleQueueLogs changes the log setting for a single queue
+func toggleQueueLogs(w http.ResponseWriter, r *http.Request) {
+	var err error
+
+	ctx := appengine.NewContext(r)
+
+	log.Debugf(ctx, "toggleQueueLogs called")
+
+	var p Page
+	if !initPage(ctx, w, r, &p) {
+		return
+	}
+
+	// Decode the POST body
+	decoder := json.NewDecoder(r.Body)
+	var s QStat
+	err = decoder.Decode(&s)
+	if err != nil {
+		failJSON(w, err.Error())
+		return
+	}
+
+	// Get the currently stored config
+	var stored QStat
+	key := datastore.NewKey(ctx, QStatKind, s.Name, 0, nil)
+	err = datastore.Get(ctx, key, &stored)
+	if err != nil {
+		if isErrFieldMismatch(err) {
+			// Ignore
+		} else {
+			// It should be there
+			failJSON(w, err.Error())
+			return
+		}
+	}
+
+	stored.LogsEnabled = s.LogsEnabled
+	_, err = datastore.Put(ctx, key, &stored)
+	if err != nil {
+		failJSON(w, err.Error())
+		return
+	}
+
+	okJSON(w, "Ok")
+}
+
+// LogPage is a view model for the page displaying queue logs
+type LogPage struct {
+	Page
+	QueueName string
+	Logs      []TaskLog
+}
+
+func logs(w http.ResponseWriter, r *http.Request) {
+	ctx := appengine.NewContext(r)
+
+	log.Debugf(ctx, "logs called")
+
+	p := LogPage{}
+
+	if !initPage(ctx, w, r, &p.Page) {
+		return
+	}
+
+	params := mux.Vars(r)
+	p.QueueName = params["name"]
+
+	p.Title = fmt.Sprintf("Loop PushQ Admin Console - %s Logs", p.QueueName)
+
+	// TODO
+	q := datastore.NewQuery(TaskLogKind).Limit(100)
+	if _, err := q.GetAll(ctx, &p.Logs); err != nil {
+		pageFail(w, err.Error())
+		return
+	}
+
+	renderPage(w, r, p, "logs.html")
 }

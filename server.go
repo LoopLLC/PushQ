@@ -35,32 +35,23 @@ type TaskHeader struct {
 type Task struct {
 	URL            string       `datastore:"u" json:"url"`
 	DelaySeconds   int          `datastore:"d" json:"delaySeconds"`
-	Payload        string       `datastore:"p" json:"payload"`
+	Payload        string       `datastore:"p,noindex" json:"payload"`
 	QueueName      string       `datastore:"q" json:"queueName"`
-	Headers        []TaskHeader `datastore:"h" json:"headers"`
+	Headers        []TaskHeader `datastore:"h,noindex" json:"headers"`
 	TimeoutSeconds int          `datastore:"t" json:"timeoutSeconds"`
 }
 
-// APIResponse is serialized to json for success and some error responses
-type APIResponse struct {
-	OK      bool        `json:"ok"`
-	Message string      `json:"msg"`
-	Data    interface{} `json:"data"`
+// TaskLog is a model for log entries about tasks
+type TaskLog struct {
+	Task
+	LogType string    `datastore:"lty" json:"logType"`
+	UTC     time.Time `datastore:"utc" json:"enqUTC"`
+	Code    int       `datastore:"cd" json:"code"`
+	Message string    `datastore:"msg" json:"message"`
 }
 
-// okJSON writes a success response
-func okJSON(w http.ResponseWriter, data interface{}) {
-	r := APIResponse{OK: true, Message: "OK", Data: data}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(r)
-}
-
-// failJSON writes a failure response
-func failJSON(w http.ResponseWriter, message string) {
-	r := APIResponse{OK: false, Message: message, Data: message}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(r)
-}
+// TaskLogKind is the name of the TaskLog table
+const TaskLogKind string = "TaskLog"
 
 // QNames is the list of queues, which should match queue.yaml
 var QNames *map[string]bool
@@ -80,8 +71,11 @@ func init() {
 	// Admin pages and JSON endpoints
 	muxRouter.HandleFunc("/admin", admin).Methods("GET")
 	muxRouter.HandleFunc("/admin/keys", keys).Methods("GET")
+	muxRouter.HandleFunc("/admin/logs/{name}", logs).Methods("GET")
 	muxRouter.HandleFunc("/admin/newapikey", newAPIKey).Methods("GET")
 	muxRouter.HandleFunc("/admin/delapikey", delAPIKey).Methods("POST")
+	muxRouter.HandleFunc("/admin/toggleQueueLogs",
+		toggleQueueLogs).Methods("POST")
 
 	// REST API
 	muxRouter.HandleFunc("/enq", enq).Methods("POST")
@@ -90,6 +84,8 @@ func init() {
 	muxRouter.HandleFunc("/testerr", testerr).Methods("POST")
 	muxRouter.HandleFunc("/counts", getAllCounts).Methods("GET")
 
+	// Make sure this matches queue.yaml
+	// These also end up getting entries in the QStat table
 	qNames := map[string]bool{
 		"default":     true,
 		"crm":         true,
@@ -102,21 +98,17 @@ func init() {
 	QNames = &qNames
 
 	funcMap := template.FuncMap{
-		"fmtms": fmtms,
+		"fmtms":  fmtms,
+		"fmtutc": fmtutc,
 	}
 
 	// Cache templates
 	templates = template.Must(
 		template.New("all").Funcs(funcMap).ParseFiles("tmpl/admin.html",
-			"tmpl/header.html", "tmpl/footer.html", "tmpl/keys.html"))
+			"tmpl/header.html", "tmpl/footer.html", "tmpl/keys.html",
+			"tmpl/logs.html"))
 
 	http.Handle("/", muxRouter)
-}
-
-// isErrFieldMismatch checks datastore errors for model mismatch
-func isErrFieldMismatch(err error) bool {
-	_, ok := err.(*datastore.ErrFieldMismatch)
-	return ok
 }
 
 // XAPIKEY is the HTTP Header for the API Key
@@ -229,8 +221,31 @@ func incrementCounters(ctx context.Context,
 	}
 }
 
+// saveLog saves a record to datastore with task info.
+func saveLog(
+	ctx context.Context,
+	task *Task,
+	logType string,
+	code int,
+	message string,
+) {
+
+	var tl TaskLog
+	tl.Task = *task
+	tl.LogType = logType
+	tl.Code = code
+	tl.Message = message
+	tl.UTC = time.Now().UTC()
+
+	key := datastore.NewIncompleteKey(ctx, TaskLogKind, nil)
+	if _, err := datastore.Put(ctx, key, &tl); err != nil {
+		log.Debugf(ctx, err.Error())
+	}
+}
+
 // enq enqueues a task
 func enq(w http.ResponseWriter, r *http.Request) {
+	var err error
 
 	ctx := appengine.NewContext(r)
 
@@ -244,7 +259,7 @@ func enq(w http.ResponseWriter, r *http.Request) {
 	var task Task
 	var jsonb []byte
 	jsonb, _ = ioutil.ReadAll(r.Body)
-	if err := json.Unmarshal(jsonb, &task); err != nil {
+	if err = json.Unmarshal(jsonb, &task); err != nil {
 		http.Error(w, "Invalid JSON", 400)
 		return
 	}
@@ -252,6 +267,13 @@ func enq(w http.ResponseWriter, r *http.Request) {
 	qNames := *QNames
 	if !qNames[task.QueueName] {
 		http.Error(w, "Invalid QueueName", http.StatusNotAcceptable)
+		return
+	}
+
+	// Get the Queue config
+	var s QStat
+	if err = getOrCreateQStat(ctx, &s, task.QueueName); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -272,7 +294,16 @@ func enq(w http.ResponseWriter, r *http.Request) {
 	if _, err := taskqueue.Add(ctx, &t, task.QueueName); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		incrementCounters(ctx, "EnqueueError", time.Now().UTC(), 1)
+
+		if s.LogsEnabled {
+			saveLog(ctx, &task, "EnqueueError", 0, err.Error())
+		}
+
 		return
+	}
+
+	if s.LogsEnabled {
+		saveLog(ctx, &task, "Enqueue", 0, "")
 	}
 
 	nowutc := time.Now().UTC()
@@ -300,6 +331,7 @@ func recordURL(ctx context.Context, url string) {
 
 // callback POSTs the task payload to the URL.
 func callback(w http.ResponseWriter, r *http.Request) {
+	var err error
 
 	ctx := appengine.NewContext(r)
 
@@ -331,6 +363,13 @@ func callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get the Queue config
+	var s QStat
+	if err = getOrCreateQStat(ctx, &s, task.QueueName); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Initialize the http client
 	var client = urlfetch.Client(ctx)
 	client.Timeout = time.Duration(task.TimeoutSeconds) * time.Second
@@ -338,6 +377,11 @@ func callback(w http.ResponseWriter, r *http.Request) {
 	req, err := http.NewRequest("POST", task.URL, bytes.NewBuffer(jsonb))
 	if err != nil {
 		log.Debugf(ctx, "Unable to create callback request: %s", err.Error())
+
+		if s.LogsEnabled {
+			saveLog(ctx, &task, "NewRequestError", 0, err.Error())
+		}
+
 		http.Error(w, "Callback Failed", 400)
 		return
 	}
@@ -353,10 +397,21 @@ func callback(w http.ResponseWriter, r *http.Request) {
 	before := time.Now().UTC()
 	if resp, err = client.Do(req); err != nil {
 		log.Debugf(ctx, "Callback client failed: %s", err.Error())
+
+		if s.LogsEnabled {
+			saveLog(ctx, &task, "ClientError", 0, err.Error())
+		}
+
 		http.Error(w, "Callback Failed", 400)
 		return
 	} else if resp.StatusCode != http.StatusOK {
-		log.Debugf(ctx, "Callback failed: %s", resp.Status)
+		log.Debugf(ctx, "Callback Failed: %s", resp.Status)
+
+		if s.LogsEnabled {
+			saveLog(ctx, &task, "CallbackError",
+				resp.StatusCode, resp.Status)
+		}
+
 		nowutc := time.Now().UTC()
 		incrementCounters(ctx, ErrCt, nowutc, 1)
 		incrementCounters(ctx, ErrCt+task.URL, nowutc, 1)
@@ -379,6 +434,11 @@ func callback(w http.ResponseWriter, r *http.Request) {
 	incrementCounters(ctx, AvgAccumCt+task.QueueName, nowutc, ms)
 
 	log.Debugf(ctx, "callback got resp in %dns: %+v", elapsedNs, resp)
+
+	if s.LogsEnabled {
+		saveLog(ctx, &task, "CallbackSuccess",
+			resp.StatusCode, resp.Status)
+	}
 }
 
 func test(w http.ResponseWriter, r *http.Request) {

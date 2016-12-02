@@ -266,3 +266,18 @@ Pushq.prototype.deleteKey = function(key) {
         pushq.alert(msg, "error");
     })
 }
+
+/**
+ * Enable or disable logging on a queue.
+ */
+Pushq.prototype.toggleQueueLogs = function(name) {
+    var pushq = this;
+    var enabled = pushq.id("log_"+name).checked;
+    pushq.postApi("toggleQueueLogs", { Name: name, LogsEnabled: enabled }, 
+    function() {
+        pushq.alert("Logs for " + name + " " + 
+            (enabled ? "enabled" : "disabled"));
+    }, function(msg) {
+        pushq.alert(msg.Message, "error");
+    })
+}

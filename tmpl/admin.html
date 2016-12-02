@@ -54,14 +54,18 @@
 					<th>Total</th>
 					<th>Today</th>
 					<th>Avg MS</th>
+					<th>Logs</th>
 				</tr>
 				{{ range .Qs }}
 				<tr>
-					<td>{{ .Name }}</td>
+					<td><a href="/admin/logs/{{.Name}}">{{ .Name }}</a></td>
 					<td>{{ .Total }}</td>
 					<td>{{ .Today }}
 						<span style="color:red;">({{ .ErrToday }})</span></td>
 					<td>{{ .AvgMS | fmtms }}</td>
+					<td><input type="checkbox" id="log_{{ .Name }}"
+						{{ if .LogsEnabled }}checked="checked"{{ end }}
+						onchange="pushq.toggleQueueLogs('{{.Name}}')" />
 				</tr>
 				{{- end}}
 			</table>

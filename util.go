@@ -2,7 +2,10 @@ package pushq
 
 import (
 	"fmt"
+	"strings"
 	"time"
+
+	"google.golang.org/appengine/datastore"
 )
 
 const (
@@ -32,4 +35,14 @@ func getTodayf(now time.Time) string {
 
 func fmtms(ms float32) string {
 	return fmt.Sprintf("%.2f", ms)
+}
+
+func fmtutc(t time.Time) string {
+	return strings.Replace(t.String(), " +0000 UTC", "", 1)
+}
+
+// isErrFieldMismatch checks datastore errors for model mismatch
+func isErrFieldMismatch(err error) bool {
+	_, ok := err.(*datastore.ErrFieldMismatch)
+	return ok
 }
